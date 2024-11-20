@@ -1,6 +1,6 @@
 // Select the canvas element
 const canvas = document.getElementById("myCanvas");
-canvas.width = 500;
+canvas.width = 900;
 canvas.height = 500;
 // Get the 2D drawing context
 const ctx = canvas.getContext("2d");
@@ -17,6 +17,8 @@ class InputHandler{
                 this.game.keys.push(e.key)
             }else if(e.key=== ' '){
                 this.game.player.shootTop()
+            } else if (e.key === 'd') {
+                this.game.debug = !this.game.debug
             }
         })
 
@@ -53,13 +55,17 @@ class Projectile {
 class Player {
     constructor(game){
         this.game = game
-        this.width = 100
+        this.width = 120
         this.height = 190
         this.x=20
         this.y=100
         this.speedY=2
         this.maxSpeed=5
         this.projectiles=[]
+        this.image = document.getElementById('player')
+        this.frameX = 0
+        this.frameY = 0
+        this.maxFrame = 37
     }
 
     update(){
@@ -71,10 +77,17 @@ class Player {
             projectile.update()
         })
         this.projectiles = this.projectiles.filter(projectile => !projectile.markForDeletion)
+        // sprite animation
+        if (this.frameX < this.maxFrame){
+            this.frameX ++
+        }else{
+            this.frameX = 0
+        }
     }
     draw(context){
-        context.fillStyle = 'white'
-        context.fillRect(this.x, this.y, this.width, this.height)
+        // context.fillStyle = 'white'
+        if (this.game.debug) context.strokeRect(this.x, this.y, this.width, this.height)
+        context.drawImage(this.image, this.frameX * this.width, this.frameY * this.height, this.width, this.height, this.x, this.y, this.width, this.height)
         this.projectiles.forEach(projectile => {
             projectile.draw(context)
         })
@@ -94,19 +107,28 @@ class Enemy {
         this.x  = this.game.width
         this.speedX = Math.random() * -1.5 - 0.5
         this.markForDeletion = false
+        this.frameX =0
+        this.frameY =0
+        this.maxFrame = 37
         this.lives=5
         this.score = this.lives
     }
 
     update(){
-        this.x += this.speedX
+        this.x += this.speedX - this.game.speed
         if (this.x + this.width < 0) this.markForDeletion = true
+
+        // sprite animation
+        if (this.frameX < this.maxFrame) {
+            this.frameX++
+        } else {
+            this.frameX = 0
+        }
     }
 
     draw(context){
-        context.fillStyle = 'red'
-        context.fillRect(this.x, this.y, this.width, this.height)
-
+        if (this.game.debug) context.strokeRect(this.x, this.y, this.width, this.height)
+        context.drawImage(this.image, this.frameX * this.width, this.frameY * this.height, this.width, this.height, this.x, this.y, this.width, this.height)
         context.fillStyle = 'black'
         context.font = '20px Helvetica'
         context.fillText(this.lives, this.x, this.y)
@@ -116,18 +138,53 @@ class Enemy {
 class Angler1 extends Enemy{
     constructor(game){
         super(game)
-        this.width = 228 * .2
-        this.height = 169 * .2
+        this.width = 228
+        this.height = 169
         this.y =  Math.random() * (this.game.height  * 0.9 - this.height)
+        this.image = document.getElementById('angler1')
+        this.frameY = Math.floor(Math.random() * 3)
     }
 }
 
 class Layer {
-
+    constructor(game, image, speedModifier){
+        this.game = game
+        this.image = image
+        this.speedModifier = speedModifier
+        this.width = 1768
+        this.height = 500
+        this.x = 0
+        this.y = 0
+    }
+    update() {
+        if (this.x <= -this.width) this.x = 0
+        this.x -= this.game.speed * this.speedModifier
+    }
+    draw(context){
+        context.drawImage(this.image, this.x, this.y)
+        context.drawImage(this.image, this.x + this.width, this.y)
+    }
 }
 
 class Background {
-
+    constructor(game){
+        this.game = game
+        this.image1 = document.getElementById('layer1')
+        this.image2 = document.getElementById('layer2')
+        this.image3 = document.getElementById('layer3')
+        this.image4 = document.getElementById('layer4')
+        this.layer1 = new Layer(this.game, this.image1, 0.2)
+        this.layer2 = new Layer(this.game, this.image2, 0.4)
+        this.layer3 = new Layer(this.game, this.image3, 1)
+        this.layer4 = new Layer(this.game, this.image4, 1.5)
+        this.layers = [this.layer1, this.layer2, this.layer3]  
+    }
+    update(){
+        this.layers.forEach(layer=>layer.update())
+    }
+    draw(context){
+        this.layers.forEach(layer => layer.draw(context))
+    }
 }
 
 
@@ -178,27 +235,32 @@ class Game {
     constructor(width, height){
         this.width=width
         this.height = height
+        this.background = new Background(this)
         this.player = new Player(this)
         this.input = new InputHandler(this)
         this.ui = new UI(this)
         this.ammo = 30
-        this.ammoMax = 100
+        this.ammoMax = 50
         this.ammoTimer = 0
         this.ammoInterval = 500
         this.enemyTimer = 0
         this.enemyInterval = 1000
         this.keys = []
         this.enemies = []
-        this.score=0
-        this.winningScore=20
+        this.score= 0
+        this.winningScore= 50
         this.gameOver = false
-        this.gameTime=0
-        this.timeLimit=5000
+        this.gameTime = 0
+        this.timeLimit = 1000 * 60
+        this.speed = 1
+        this.debug = false
     }
 
     update(deltaTime){
         if(!this.gameOver) this.gameTime += deltaTime
         if(this.gameTime > this.timeLimit) this.gameOver = true
+        this.background.update()
+        this.background.layer1.update()
         this.player.update()          
         if (this.ammoTimer > this.ammoInterval){
             if(this.ammo < this.ammoMax) this.ammo++
@@ -221,7 +283,6 @@ class Game {
                         if(!this.gameOver) this.score += enemy.score
                         if(this.score > this.winningScore) this.gameOver = true
                     }
-
                 }
             })   
         })
@@ -236,11 +297,13 @@ class Game {
         }
     }
     draw(context){
+        this.background.draw(context)
         this.player.draw(context)
         this.ui.draw(context)
         this.enemies.forEach(enemy => {
             enemy.draw(context)
         })
+        this.background.layer4.draw(context)
     }
     addEnemy(){
         this.enemies.push(new Angler1(this))
