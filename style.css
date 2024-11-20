@@ -1,0 +1,16 @@
+*{
+    margin:0;
+    padding:0;
+    box-sizing: border-box;
+}
+
+#myCanvas{
+    border :5px solid black;
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform: translate(-50%,-50%);
+    background: rgb(157, 76, 245);
+    max-width:100%;
+    max-height:100%;
+}
