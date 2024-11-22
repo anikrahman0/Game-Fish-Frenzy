@@ -39,6 +39,8 @@ class Projectile {
         this.height = 3
         this.speed = 3
         this.markForDeletion = false
+        this.image = document.getElementById('projectile') 
+        this.powerUpImage = document.getElementById('powerup') 
     }
 
     update(){
@@ -47,8 +49,52 @@ class Projectile {
     }
 
     draw(context){
-        context.fillStyle ='yellow'
-        context.fillRect(this.x, this.y, this.width, this.height)
+        // context.fillStyle ='yellow'
+        // context.fillRect(this.x, this.y, this.width, this.height)
+        if(this.game.player.powerUp){
+            context.drawImage(this.powerUpImage, this.x, this.y)
+        }else{
+            context.drawImage(this.image, this.x, this.y)
+        }
+    }
+}
+
+class Particle{
+    constructor(game, x, y){
+        this.game = game
+        this.x = x
+        this.y = y
+        this.image = document.getElementById('gears')
+        this.frameX = Math.floor(Math.random() * 3)
+        this.frameY = Math.floor(Math.random() * 3)
+        this.spriteSize = 50
+        this.sizeModifier = (Math.random() * 0.5 + 0.5).toFixed(1)
+        this.size = this.spriteSize * this.sizeModifier
+        this.speedX = Math.random() * 6 - 3
+        this.speedY = Math.random() * -15
+        this.gravity = 0.5
+        this.markForDeletion = false
+        this.angle = 0
+        this.va = Math.random() * 0.2 - 0.1
+        this.bounced = 0
+        this.bottomBounceBoundary = Math.random() * 100 + 60
+    }
+
+    update(){
+        this.angle += this.va
+        this.speedY += this.gravity
+        this.x -= this.speedX
+        this.y += this.speedY
+        if(this.y > this.game.height + this.size || this.x < 0 - this.size){
+            this.markForDeletion = true
+        }
+        if (this.y > this.game.height - this.bottomBounceBoundary && this.bounced < 2){
+            this.bounced ++
+            this.speedY *= -0.7
+        }
+    }
+    draw(context){
+        context.drawImage(this.image, this.frameX * this.spriteSize, this.frameY * this.spriteSize, this.spriteSize, this.spriteSize ,this.x, this.y, this.size, this.size)
     }
 }
 
@@ -76,6 +122,11 @@ class Player {
         else if (this.game.keys.includes('ArrowDown')) this.speedY = this.maxSpeed
         else this.speedY = 0
         this.y += this.speedY
+        if(this.y  >  this.game.height - this.height * 0.5){
+            this.y = this.game.height - this.height * 0.5
+        }else if(this.y < -this.height * 0.5){
+            this.y = -this.height * 0.5
+        }
         this.projectiles.forEach(projectile =>{
             projectile.update()
         })
@@ -102,10 +153,10 @@ class Player {
     draw(context){
         // context.fillStyle = 'white'
         if (this.game.debug) context.strokeRect(this.x, this.y, this.width, this.height)
-        context.drawImage(this.image, this.frameX * this.width, this.frameY * this.height, this.width, this.height, this.x, this.y, this.width, this.height)
         this.projectiles.forEach(projectile => {
             projectile.draw(context)
         })
+        context.drawImage(this.image, this.frameX * this.width, this.frameY * this.height, this.width, this.height, this.x, this.y, this.width, this.height)
     }
 
     shootTop(){
@@ -158,8 +209,8 @@ class Enemy {
         if (this.game.debug) context.strokeRect(this.x, this.y, this.width, this.height)
         context.drawImage(this.image, this.frameX * this.width, this.frameY * this.height, this.width, this.height, this.x, this.y, this.width, this.height)
         context.fillStyle = 'yellow'
-        context.font = '20px Helvetica'
-        context.fillText(this.lives, this.x, this.y)
+        context.font = '20px Bangers'
+        if (this.game.debug)  context.fillText(this.lives, this.x, this.y)
     }
 }
 
@@ -248,7 +299,7 @@ class UI {
     constructor(game){
         this.game = game
         this.fontSize = '15'
-        this.fontFamily = 'Helvetica'
+        this.fontFamily = 'Bangers'
         this.color = 'white '
     }
     draw(context){
@@ -259,9 +310,6 @@ class UI {
         context.shadowColor = 'black'
         context.font =  this.fontSize + 'px ' + this.fontFamily
         context.fillText('Score: '+ this.game.score, 20, 40)
-        for (let i = 0; i < this.game.ammo; i++){
-            context.fillRect(20 + 5  * i, 50, 4, 20)
-        }
         const formatedTime = (this.game.gameTime * 0.001). toFixed(1)
         context.fillText('Time: ' + formatedTime, 20, 90)
         if(this.game.gameOver){
@@ -277,11 +325,15 @@ class UI {
             }
         
             
-            context.font = '40px '+ this.fontFamily
-            context.fillText(message1, this.game.width * .5, this.game.height * .5 - 40)
+            context.font = '70px '+ this.fontFamily
+            context.fillText(message1, this.game.width * .5, this.game.height * .5 - 20)
 
-            context.font = '20px ' + this.fontFamily
-            context.fillText(message2, this.game.width * .5, this.game.height * .5 + 40)
+            context.font = '25px ' + this.fontFamily
+            context.fillText(message2, this.game.width * .5, this.game.height * .5 + 20)
+        }
+        if (this.game.player.powerUp) context.fillStyle = '#ffffbd'
+        for (let i = 0; i < this.game.ammo; i++) {
+            context.fillRect(20 + 5 * i, 50, 4, 20)
         }
         context.restore()
     }
@@ -303,11 +355,12 @@ class Game {
         this.enemyInterval = 1000
         this.keys = []
         this.enemies = []
+        this.particles = []
         this.score= 0
         this.winningScore= 50
         this.gameOver = false
         this.gameTime = 0
-        this.timeLimit = 1000 * 60
+        this.timeLimit = 1000 * 60 * 2
         this.speed = 1
         this.debug = false
     }
@@ -324,11 +377,15 @@ class Game {
         }else{
             this.ammoTimer += deltaTime 
         }
-
+        this.particles.forEach(particle => particle.update())
+        this.particles = this.particles.filter(particle => !particle.markForDeletion)
         this.enemies.forEach(enemy =>{
             enemy.update()
             if (this.collisionCheck(this.player, enemy)) {
                 enemy.markForDeletion = true
+                for (let i = 0; i < 10; i++) {
+                    this.particles.push(new Particle(this, enemy.x + enemy.width * 0.5, enemy.y + enemy.height * 0.5))
+                }
                 if(enemy.type = 'lucky') this.player.enterPowerUp()
                 else this.score--
             }
@@ -336,8 +393,12 @@ class Game {
                 if (this.collisionCheck(projectile, enemy)) {
                     enemy.lives--
                     projectile.markForDeletion = true
+                    this.particles.push(new Particle(this, enemy.x + enemy.width * 0.5, enemy.y + enemy.height * 0.5))
                     if(enemy.lives <= 0){
                         enemy.markForDeletion = true
+                        for (let i = 0; i < 10; i++) {
+                            this.particles.push(new Particle(this, enemy.x + enemy.width * 0.5, enemy.y + enemy.height * 0.5))
+                        }
                         if(!this.gameOver) this.score += enemy.score
                         if(this.score > this.winningScore) this.gameOver = true
                     }
@@ -358,9 +419,8 @@ class Game {
         this.background.draw(context)
         this.player.draw(context)
         this.ui.draw(context)
-        this.enemies.forEach(enemy => {
-            enemy.draw(context)
-        })
+        this.particles.forEach(particle => particle.draw(context))
+        this.enemies.forEach(enemy => { enemy.draw(context) })
         this.background.layer4.draw(context)
     }
     addEnemy(){
